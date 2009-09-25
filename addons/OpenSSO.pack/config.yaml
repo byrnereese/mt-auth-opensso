@@ -1,7 +1,7 @@
 id: OpenSSO
 name: "OpenSSO"
 description: "This adds support for Sun's OpenSSO federated authentication system to Movable Type."
-version: 1.0
+version: 1.0 Beta 2
 
 config_settings:
   OpenSSOMethod: 

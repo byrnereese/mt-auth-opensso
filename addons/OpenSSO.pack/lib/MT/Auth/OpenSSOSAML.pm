@@ -28,14 +28,11 @@ sub new_user {
 }
 
 sub validate_credentials {
-    MT->log({ message => 'validate_credentials()' });
     my $auth = shift;
     my ($ctx, %credentials) = @_;
 
     my $app = $ctx->{app};
     my $username = $ctx->{username};
-
-    MT->log({ message => "User with username: ".($username ? $username : 'none')." accessing application." });
 
     if ((defined $username) && ($username ne '')) {
         # load author from db
@@ -61,7 +58,6 @@ sub validate_credentials {
 	    }
 	}
     }
-
     my $url = caturl( OPENSSO_BASE_URL , 'idpssoinit' ) . 
 	'?realm=/'.
 	'&iPSPCookie=yes'.
@@ -69,17 +65,31 @@ sub validate_credentials {
 	'&metaAlias=/idp'.
 	'&spEntityID='.OPENSSO_SPID.
 	'&binding=urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'.
-	'&RelayState='.$app->return_uri();
+	'&RelayState='.$app->return_uri . $app->query_string;
     
-    MT->log({ message => "Redirecting to $url" });
     $app->redirect($url);
     return MT::Auth::REDIRECT_NEEDED();
 }
 
-sub fetch_credentials {
-    MT->log({ message => 'fetch_credentials()' });
+sub session_credentials {
     my $auth = shift;
-    return $auth->SUPER::session_credentials(@_);
+    my ($ctx) = @_;
+
+    my $app = $ctx->{app} or return;
+    my $cookies = $app->cookies;
+    if ($cookies->{$app->user_cookie}) {
+        my ($user, $session_id, $remember) = split /::/, $cookies->{$app->user_cookie}->value;
+        return { %$ctx, username => $user, session_id => $session_id, permanent => $remember, auth_type => 'OpenSSO' };
+    }
+    return undef;
+}
+
+sub fetch_credentials {
+    my $auth = shift;
+    my ($ctx) = @_;
+    my $fallback = { %$ctx };
+    my $creds = $auth->session_credentials($ctx) || $fallback ;
+    return $creds;
 }
 
 #is_valid_password
