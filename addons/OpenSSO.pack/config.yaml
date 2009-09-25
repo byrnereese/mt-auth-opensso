@@ -1,0 +1,24 @@
+id: OpenSSO
+name: "OpenSSO"
+description: "This adds support for Sun's OpenSSO federated authentication system to Movable Type."
+version: 1.0
+
+config_settings:
+  OpenSSOMethod: 
+    default: 'SAML'
+  OpenSSOCookieName: 
+    default: 'iPlanetDirectoryPro'
+  OpenSSOBaseURL: 
+    default: 'http://demo.example.com:8080/opensso/'
+  OpenSSOSPID: 
+    default: '~'
+  OpenSSOSyncAttributes:
+  OpenSSOLookUpAttribute: 
+    default: 'uid:name'
+
+applications:
+  cms:
+    methods:
+      opensso_response: 
+        code: $OpenSSO::OpenSSO::Plugin::response
+        requires_login: 0
