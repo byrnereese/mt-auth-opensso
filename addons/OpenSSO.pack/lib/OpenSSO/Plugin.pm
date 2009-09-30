@@ -33,6 +33,90 @@ use constant SAML2_SC_UNSUPPBIN => 'urn:oasis:names:tc:SAML:2.0:status:Unsupport
 
 use constant XML_SIG_METHOD_RSA => 'http://www.w3.org/2000/09/xmldsig#rsa-sha1';
 
+sub edit_author {
+    my ( $eh, $app, $param, $tmpl) = @_;
+    return unless UNIVERSAL::isa($tmpl, 'MT::Template');
+    my $q    = $app->param;
+    my $type = $q->param('_type');
+    my $class = $app->model($type) or return;
+    my $id = $q->param('id');
+    my $author = $app->user;
+    my $obj_promise = MT::Promise::delay(
+        sub {
+            return $class->load($id) || undef;
+        }
+    );
+    my $obj;
+    if ($id) {
+        $obj = $obj_promise->force()
+          or return $app->error(
+            $app->translate(
+                "Load failed: [_1]",
+                $class->errstr || $app->translate("(no reason given)")
+            )
+          );
+        if ( $type eq 'author' ) {
+            require MT::Auth;
+            if ( $app->user->is_superuser ) {
+                if ( $app->config->ExternalUserManagement ) {
+                    if ( MT::Auth->synchronize_author( User => $obj ) ) {
+                        $obj = $class->load($id);
+                        ## we only sync name and status here
+                        $param->{name}   = $obj->name;
+                        $param->{status} = $obj->status;
+                        if ( ( $id == $author->id ) && ( !$obj->is_active ) ) {
+                            ## superuser has been attempted to disable herself - something bad
+                            $obj->status( MT::Author::ACTIVE() );
+                            $obj->save;
+                            $param->{superuser_attempted_disabled} = 1;
+                        }
+                    }
+                    my $id = $obj->external_id;
+                    $id = '' unless defined $id;
+                    if (length($id) && ($id !~ m/[\x00-\x1f\x80-\xff]/)) {
+                        $param->{show_external_id} = 1;
+                    }
+                }
+                delete $param->{can_edit_username};
+            }
+            else {
+                if ( !$app->config->ExternalUserManagement ) {
+                    $param->{can_edit_username} = 1;
+                }
+            }
+            $param->{group_count} = $obj->group_count;
+        }
+    }
+    else {    # object is new                                                                                      
+        if ( $type eq 'author' ) {
+            if ( !$app->config->ExternalUserManagement ) {
+                if ( $app->config->AuthenticationModule ne 'MT' ) {
+                    $param->{new_user_external_auth} = '1';
+                }
+            }
+        }
+    }
+    if ( $type eq 'author' ) {
+        $param->{'external_user_management'} =
+	    $app->config->ExternalUserManagement;
+    }
+    my $element = $tmpl->getElementById('system_msg');
+    if ( $element ) {
+        my $contents = $element->innerHTML;
+        my $text = <<EOT;
+<mt:if name="superuser_attempted_disabled">
+    <mtapp:statusmsg
+        id="superuser-atempted-disabled"
+        class="alert">
+        <__trans_section component="enterprise"><__trans phrase="Movable Type Enterprise has just attempted to disable your account during synchronization with the external directory. Some of the external user management settings must be wrong. Please correct your configuration before proceeding."></__trans_section>
+    </mtapp:statusmsg>
+</mt:if>
+EOT
+$element->innerHTML($text . $contents);
+    }
+    $tmpl;
+}
+
 sub response {
     my $app = shift;
     my $q = $app->{query};

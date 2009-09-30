@@ -1,9 +1,18 @@
 id: OpenSSO
 name: "OpenSSO"
 description: "This adds support for Sun's OpenSSO federated authentication system to Movable Type."
-version: 1.0 Beta 2
+version: 1.0
 
 config_settings:
+  ExternalUserManagement:
+    default: 0
+    handler: >
+            sub {
+                my $mgr = shift;
+                return $mgr->set_internal( 'ExternalUserManagement', @_ ) if @_;
+                ( $mgr->AuthenticationModule ne 'MT' )
+                  && $mgr->get_internal('ExternalUserManagement') ? 1 : 0;
+            }
   OpenSSOMethod: 
     default: 'SAML'
   OpenSSOCookieName: 
@@ -22,3 +31,6 @@ applications:
       opensso_response: 
         code: $OpenSSO::OpenSSO::Plugin::response
         requires_login: 0
+
+callbacks:
+  template_param.edit_author: $OpenSSO::OpenSSO::Plugin::edit_author
